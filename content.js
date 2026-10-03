@@ -1,6 +1,6 @@
 //Script de código que controlará el contador de mensajes en ChatGPT e interrumpe el uso cuando se llega al límite
 
-const DAILY_LIMIT = 1; // Límite diario de prueba configurado a 1 consulta
+const DAILY_LIMIT = 5; // Límite diario de prueba
 
 // Función para aplicar bloqueo visual y técnico persistente en la página
 function enforceBlockade(message) {
