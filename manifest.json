@@ -1,0 +1,17 @@
+{
+  "_comment": "Define los permisos necesarios para interactuar con la página de ChatGPT y almacenar el conteo diario en el almacenamiento local del navegador. Además, le indica al navegador qué tipo de extensión es",
+  "manifest_version": 3,
+  "name": "Proyecto CNG 4 Creatividad - Conciencia Hídrica Digital",
+  "version": "1.0",
+  "description": "Limita el uso diario de ChatGPT para concientizar sobre la huella hídrica digital.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://chatgpt.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["messages.js", "content.js"]
+    }
+  ]
+}
