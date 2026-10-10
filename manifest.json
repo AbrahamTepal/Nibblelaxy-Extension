@@ -8,6 +8,10 @@
   "host_permissions": [
     "https://chatgpt.com/*"
   ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Nibblelaxy Dashboard"
+  },
   "content_scripts": [
     {
       "matches": ["https://chatgpt.com/*"],

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Nibblelaxy Dashboard</title>
+  <style>
+    /* Estilos base de la interfaz emergente */
+    body {
+      width: 320px;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background-color: #f4f7f6;
+      color: #333333;
+    }
+
+    .card {
+      background-color: #ffffff;
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 12px;
+    }
+
+    .header-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #0056b3;
+      margin: 0 0 4px 0;
+      text-align: center;
+    }
+
+    .header-sub {
+      font-size: 11px;
+      color: #666666;
+      text-align: center;
+      margin: 0 0 12px 0;
+    }
+
+    .metric-container {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #eeeeee;
+      padding-bottom: 6px;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #555555;
+    }
+
+    .metric-value {
+      font-size: 13px;
+      font-weight: bold;
+      color: #0275d8;
+    }
+
+    .equivalence-box {
+      background-color: #e8f4f8;
+      border-left: 4px solid #0275d8;
+      padding: 8px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #1b4965;
+    }
+
+    .footer-info {
+      font-size: 10px;
+      color: #888888;
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1 class="header-title">Nibblelaxy</h1>
+    <p class="header-sub">Monitoreo de Huella Hidrica Digital</p>
+
+    <!-- Seccion de metricas diarias -->
+    <div class="metric-container">
+      <span class="metric-label">Consultas de hoy:</span>
+      <span class="metric-value" id="prompts-count">0</span>
+    </div>
+
+    <div class="metric-container">
+      <span class="metric-label">Agua estimada:</span>
+      <span class="metric-value" id="water-volume">0 ml</span>
+    </div>
+
+    <!-- Seccion de equivalencia cotidiana -->
+    <div class="equivalence-box" id="equivalence-text">
+      Cargando datos de consumo...
+    </div>
+  </div>
+
+  <div class="footer-info">
+    Universidad Politecnica de San Luis Potosi - ODS 6 y ODS 12
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
