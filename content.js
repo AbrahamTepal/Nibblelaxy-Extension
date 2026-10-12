@@ -1,9 +1,12 @@
-const DAILY_LIMIT = 2; // Límite diario de consultas configurado para la prueba
-const ML_PER_PROMPT = 15; // Estimación basada en la investigación del proyecto (15 ml por consulta)
+// ==========================================
+// CONFIGURACIÓN Y CONSTANTES GLOBALES
+// ==========================================
+const DAILY_LIMIT = 5; // Límite diario de consultas permitidas configurado para la prueba
+const ML_PER_PROMPT = 15; // Estimación de agua consumida basada en la investigación del proyecto (15 ml por consulta)
 
-let blockedAttemptsToday = 0;
+let blockedAttemptsToday = 0; // Contador en memoria de los intentos bloqueados el día de hoy
 
-// Función para obtener la clave de fecha local exacta sin desfases de UTC
+// Función para obtener la clave de fecha local exacta en formato 'YYYY-MM-DD' sin desfases de zonas horarias (UTC)
 function getLocalDateKey(dateObj) {
   const year = dateObj.getFullYear();
   const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -11,14 +14,17 @@ function getLocalDateKey(dateObj) {
   return `${year}-${month}-${day}`;
 }
 
-// Función principal para inyectar el panel lateral
+// ==========================================
+// CREACIÓN E INYECCIÓN DEL DASHBOARD (SIDEBAR)
+// ==========================================
 function injectSidebarDashboard() {
+  // Evita duplicar el panel si ya se encuentra inyectado en el DOM
   if (document.getElementById("nibblelaxy-sidebar")) return;
 
   const todayObj = new Date();
   const todayKey = getLocalDateKey(todayObj);
 
-  // Generamos las claves de los últimos 5 días reales sin desfase
+  // Generamos un arreglo con las claves de los últimos 5 días para la gráfica histórica
   const daysKeys = [];
   for (let i = 4; i >= 0; i--) {
     const d = new Date();
@@ -26,24 +32,30 @@ function injectSidebarDashboard() {
     daysKeys.push(getLocalDateKey(d));
   }
 
+  // Preparamos las llaves a consultar en el almacenamiento local de Chrome
   const storageKeys = [...daysKeys, 'blocked_' + todayKey, 'nibble_theme'];
 
   chrome.storage.local.get(storageKeys, (result) => {
+    // Obtenemos los valores guardados o asignamos valores por defecto
     const currentCount = result[todayKey] || 0;
     blockedAttemptsToday = result['blocked_' + todayKey] || 0;
-    const currentTheme = result['nibble_theme'] || 'dark';
+    const currentTheme = result['nibble_theme'] || 'light';
 
+    // Cálculos de consumo hídrico y equivalencia en vasos (250 ml por vaso)
     const totalMl = currentCount * ML_PER_PROMPT;
-    let waterText = totalMl >= 1000 ? `${(totalMl / 1000).toFixed(2)} Litros` : `${totalMl} ml`;
-    const glasses = (totalMl / 250).toFixed(1);
+    let waterText = totalMl >= 1000 ? `${(totalMl / 1000).toFixed(3)} Litros` : `${totalMl} ml`;
+    const glasses = (totalMl / 250).toFixed(3);
 
+    // Definición de iconos y textos descriptivos según el tema (claro u oscuro)
     const themeIcon = currentTheme === 'dark' ? '☀️' : '🌙';
     const themeTooltip = currentTheme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
 
+    // Determinación dinámica de los estatus visuales del usuario
     let statusText = "Óptimo";
     let statusColor = currentTheme === 'dark' ? "#10b981" : "#059669"; 
     let statusBg = currentTheme === 'dark' ? "rgba(16, 185, 129, 0.15)" : "#ecfdf5";
-    if (currentCount >= 1 && currentCount < DAILY_LIMIT) {
+    
+    if (currentCount > 0 && currentCount < DAILY_LIMIT) {
       statusText = "Moderado";
       statusColor = currentTheme === 'dark' ? "#fbbf24" : "#d97706";
       statusBg = currentTheme === 'dark' ? "rgba(251, 191, 36, 0.15)" : "#fffbeb";
@@ -53,11 +65,18 @@ function injectSidebarDashboard() {
       statusBg = currentTheme === 'dark' ? "rgba(239, 68, 68, 0.15)" : "#fef2f2";
     }
 
+    // Cálculo del ahorro total de agua protegido gracias a los bloqueos
     const savedMl = blockedAttemptsToday * ML_PER_PROMPT;
 
+    // Mapeo de valores históricos en mililitros para la gráfica
     const mlValues = daysKeys.map(key => (result[key] || 0) * ML_PER_PROMPT);
 
-    // Mapeo corregido de días de la semana con abreviaturas claras (L, Ma, Mi, J, V, S, D)
+    // Cálculo de la escala máxima del Eje Y dinámico
+    const maxDataValue = Math.max(...mlValues, 150);
+    const scaleMax = maxDataValue <= 150 ? 150 : Math.ceil(maxDataValue / 50) * 50; 
+    const midScale = scaleMax / 2;
+
+    // Obtención de las iniciales de los días de la semana correspondientes
     const dayNames = daysKeys.map(key => {
       const parts = key.split('-');
       const date = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -65,16 +84,18 @@ function injectSidebarDashboard() {
       return weekdays[date.getDay()];
     });
 
-    const scaleMax = 150;
+    // Cálculo proporcional de la altura de las barras (máximo 90px de contenedor)
     const heights = mlValues.map(val => Math.min((val / scaleMax) * 90, 90));
 
+    // Creación del elemento principal del Dashboard lateral
     const sidebar = document.createElement("div");
     sidebar.id = "nibblelaxy-sidebar";
     sidebar.className = currentTheme === 'light' ? 'light-theme' : 'dark-theme';
     
+    // Inyección de la estructura HTML interna del panel
     sidebar.innerHTML = `
-      <div id="nibblelaxy-header">
-        <span>Nibblelaxy | Dashboard ODS 6</span>
+      <div id="nibblelaxy-header" title="Haz clic y arrastra para mover el panel libremente">
+        <span>Control de Consumo Hídrico</span>
         <div class="header-buttons">
           <button id="nibblelaxy-theme-toggle" title="${themeTooltip}">${themeIcon}</button>
           <button id="nibblelaxy-toggle" title="Minimizar panel">-</button>
@@ -82,8 +103,8 @@ function injectSidebarDashboard() {
       </div>
       <div id="nibblelaxy-body">
         
-        <div class="nibble-section-title">Estatus de Interacción</div>
-        <div class="nibble-status-badge" style="background-color: ${statusBg}; border-color: ${statusColor}; color: ${statusColor};">
+        <div class="nibble-section-title">Estatus de Interacción con la IA</div>
+        <div class="nibble-status-badge" id="nibble-status-badge" style="background-color: ${statusBg}; border-color: ${statusColor}; color: ${statusColor};">
           Nivel: <strong id="nibble-status-text">${statusText}</strong>
         </div>
 
@@ -93,12 +114,12 @@ function injectSidebarDashboard() {
           <span class="nibble-value" id="nibble-count">${currentCount}</span>
         </div>
         <div class="nibble-metric hover-card">
-          <span class="nibble-label">Agua estimada:</span>
+          <span class="nibble-label">Agua estimada por consulta:</span>
           <span class="nibble-value" id="nibble-water">${waterText}</span>
         </div>
         
         <div class="nibble-box hover-card">
-          Tus consultas equivalen a <strong>${glasses} vasos</strong> de agua (250 ml) evaporados en servidores (ODS 6 y 12).
+          Tus consultas equivalen a <strong id="nibble-glasses">${glasses}</strong> vasos de agua (250 ml) evaporados en servidores.
         </div>
 
         <div class="nibble-section-title" style="margin-top: 14px;">Impacto de Ahorro Hídrico</div>
@@ -106,13 +127,13 @@ function injectSidebarDashboard() {
           Agua protegida por bloqueo: <strong id="nibble-saved-val">${savedMl} ml</strong>
         </div>
 
-        <div class="nibble-section-title" style="margin-top: 14px;">Huella Hídrica Histórica (5 Días)</div>
+        <div class="nibble-section-title" style="margin-top: 14px;">Huella Hídrica Semanal (últimos 5 Días)</div>
         
         <div class="chart-wrapper">
           <div class="y-axis-label">Agua (ml)</div>
           <div class="y-axis-scale">
-            <span>150ml</span>
-            <span>75ml</span>
+            <span id="scale-max-label">${scaleMax}ml</span>
+            <span id="scale-mid-label">${midScale}ml</span>
             <span>0ml</span>
           </div>
 
@@ -121,41 +142,46 @@ function injectSidebarDashboard() {
               <div class="chart-bar-container">
                 <span class="bar-exact-value">${Math.round(mlValues[0])}</span>
                 <div class="chart-bar" style="height: ${heights[0]}px;"></div>
-                <span class="chart-label">${dayNames[0]}</span>
               </div>
               <div class="chart-bar-container">
                 <span class="bar-exact-value">${Math.round(mlValues[1])}</span>
                 <div class="chart-bar" style="height: ${heights[1]}px;"></div>
-                <span class="chart-label">${dayNames[1]}</span>
               </div>
               <div class="chart-bar-container">
                 <span class="bar-exact-value">${Math.round(mlValues[2])}</span>
                 <div class="chart-bar" style="height: ${heights[2]}px;"></div>
-                <span class="chart-label">${dayNames[2]}</span>
               </div>
               <div class="chart-bar-container">
                 <span class="bar-exact-value">${Math.round(mlValues[3])}</span>
                 <div class="chart-bar" style="height: ${heights[3]}px;"></div>
-                <span class="chart-label">${dayNames[3]}</span>
               </div>
               <div class="chart-bar-container">
                 <span class="bar-exact-value" id="label-today-val">${Math.round(mlValues[4])}</span>
                 <div class="chart-bar active-bar" style="height: ${heights[4]}px;" id="chart-today-bar"></div>
-                <span class="chart-label">Hoy</span>
               </div>
             </div>
             
             <div class="x-axis-line"></div>
+
+            <div class="chart-days-row">
+              <span class="chart-label">${dayNames[0]}</span>
+              <span class="chart-label">${dayNames[1]}</span>
+              <span class="chart-label">${dayNames[2]}</span>
+              <span class="chart-label">${dayNames[3]}</span>
+              <span class="chart-label">Hoy</span>
+            </div>
+
             <div class="x-axis-label">Días recientes</div>
           </div>
         </div>
 
         <div class="nibble-tip">
-          "Reducir el uso innecesario de la IA fomenta el criterio propio y protege los recursos naturales de México."
+          "Reducir el uso innecesario de la IA fomenta el criterio propio y protege los recursos naturales del planeta."
         </div>
       </div>
     `;
 
+    // Creación y aplicación de los estilos CSS encapsulados para el panel
     const style = document.createElement("style");
     style.innerHTML = `
       #nibblelaxy-sidebar {
@@ -170,7 +196,6 @@ function injectSidebarDashboard() {
         z-index: 999998 !important;
         font-family: Arial, sans-serif !important;
         backdrop-filter: blur(12px);
-        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         display: flex;
         flex-direction: column;
         animation: slideInRight 0.5s ease-out;
@@ -259,6 +284,8 @@ function injectSidebarDashboard() {
         justify-content: space-between;
         align-items: center;
         letter-spacing: 0.5px;
+        cursor: move;
+        user-select: none;
       }
       .header-buttons {
         display: flex;
@@ -397,6 +424,17 @@ function injectSidebarDashboard() {
         background-color: rgba(100, 116, 139, 0.4);
         margin-top: 2px;
       }
+      .chart-days-row {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 3px;
+      }
+      .chart-label {
+        font-size: 9px;
+        font-weight: bold;
+        text-align: center;
+        flex: 1;
+      }
       .x-axis-label {
         font-size: 9px;
         font-weight: bold;
@@ -417,6 +455,54 @@ function injectSidebarDashboard() {
     document.head.appendChild(style);
     document.body.appendChild(sidebar);
 
+    // ==========================================
+    // LÓGICA DE ARRASTRE LIBRE (DRAG AND DROP)
+    // ==========================================
+    const header = document.getElementById("nibblelaxy-header");
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+
+    header.addEventListener("mousedown", (e) => {
+      // Evita activar el arrastre si se interactúa con los botones internos
+      if (e.target.tagName === "BUTTON") return;
+
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      // Obtenemos la posición actual exacta en pantalla del panel
+      const rect = sidebar.getBoundingClientRect();
+      initialLeft = rect.left;
+      initialTop = rect.top;
+
+      // Forzamos el uso de setProperty con '!important' para sobrescribir los estilos fijos por defecto y permitir movimiento vertical/horizontal libre
+      sidebar.style.setProperty('right', 'auto', 'important');
+      sidebar.style.setProperty('bottom', 'auto', 'important');
+      sidebar.style.setProperty('left', `${initialLeft}px`, 'important');
+      sidebar.style.setProperty('top', `${initialTop}px`, 'important');
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    });
+
+    function onMouseMove(e) {
+      if (!isDragging) return;
+      // Calculamos la distancia recorrida por el cursor respecto al punto inicial
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      // Actualizamos simultáneamente la posición en el eje X (left) y Y (top)
+      sidebar.style.setProperty('left', `${initialLeft + dx}px`, 'important');
+      sidebar.style.setProperty('top', `${initialTop + dy}px`, 'important');
+    }
+
+    function onMouseUp() {
+      isDragging = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    // Evento para alternar entre modo claro y oscuro guardando la preferencia
     document.getElementById("nibblelaxy-theme-toggle").addEventListener("click", () => {
       const isDark = sidebar.classList.contains("dark-theme");
       const newTheme = isDark ? "light" : "dark";
@@ -428,6 +514,7 @@ function injectSidebarDashboard() {
       });
     });
 
+    // Evento para minimizar o expandir el panel lateral
     let minimized = false;
     document.getElementById("nibblelaxy-toggle").addEventListener("click", () => {
       minimized = !minimized;
@@ -438,24 +525,36 @@ function injectSidebarDashboard() {
   });
 }
 
+// ==========================================
+// CONTROL DE BLOQUEO Y BANNER DE ALERTA
+// ==========================================
 function enforceBlockade(message) {
+  // Inyección de estilos para el banner flotante central y bloqueo de la interfaz de ChatGPT
   if (!document.getElementById("nibblelaxy-block-style")) {
     const style = document.createElement("style");
     style.id = "nibblelaxy-block-style";
     style.innerHTML = `
       #nibblelaxy-block-banner {
         position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        background-color: #dc2626 !important;
+        bottom: 90px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: 450px !important;
+        background: rgba(15, 23, 42, 0.95) !important;
         color: white !important;
         text-align: center !important;
-        padding: 12px 20px !important;
+        padding: 18px 24px !important;
         z-index: 2147483647 !important;
-        font-weight: bold !important;
-        font-size: 14px !important;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.3) !important;
+        border-radius: 12px !important;
+        border: 1px solid #ef4444 !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+        font-size: 13px !important;
+        backdrop-filter: blur(10px);
+        animation: fadeInUp 0.4s ease-out;
+      }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translate(-50%, 20px); }
+        to { opacity: 1; transform: translate(-50%, 0); }
       }
       form, #prompt-textarea, button[data-testid="send-button"] {
         pointer-events: none !important;
@@ -465,14 +564,19 @@ function enforceBlockade(message) {
     document.head.appendChild(style);
   }
 
+  // Creación del banner de advertencia con el mensaje reflexivo en renglón aparte
   if (!document.getElementById("nibblelaxy-block-banner")) {
     const banner = document.createElement("div");
     banner.id = "nibblelaxy-block-banner";
-    banner.innerText = `LÍMITE DIARIO ALCANZADO (Nibblelaxy): ${message}`;
+    banner.innerHTML = `
+      <div style="color: #ef4444; font-weight: bold; font-size: 14px; margin-bottom: 8px;">Has alcanzado tu límite diario de consultas.</div>
+      <div style="color: #cbd5e1; font-size: 12px; line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 8px;">${message}</div>
+    `;
     document.body.appendChild(banner);
   }
 }
 
+// Función principal que intercepta las acciones del usuario para validar cuotas y aplicar bloqueos
 function checkUsageAndBlock(event) {
   const todayKey = getLocalDateKey(new Date());
 
@@ -480,6 +584,7 @@ function checkUsageAndBlock(event) {
     let currentCount = result[todayKey] || 0;
     let blockedCount = result['blocked_' + todayKey] || 0;
 
+    // Si ya se superó el límite, se cancela el evento, se acumula el ahorro y se muestra el bloqueo
     if (currentCount >= DAILY_LIMIT) {
       if (event) {
         event.preventDefault();
@@ -496,42 +601,117 @@ function checkUsageAndBlock(event) {
         }
       });
 
-      enforceBlockade("Considera investigar por cuenta propia para proteger los recursos hídricos.");
-    } else if (event) {
-      chrome.storage.local.set({ [todayKey]: currentCount + 1 }, () => {
-        const newCount = currentCount + 1;
-        const newMl = newCount * ML_PER_PROMPT;
-
-        const counterEl = document.getElementById("nibble-count");
-        if (counterEl) counterEl.innerText = newCount;
-
-        const waterEl = document.getElementById("nibble-water");
-        if (waterEl) {
-          waterEl.innerText = newMl >= 1000 ? `${(newMl / 1000).toFixed(2)} Litros` : `${newMl} ml`;
-        }
-
-        const todayBar = document.getElementById("chart-today-bar");
-        const todayValLabel = document.getElementById("label-today-val");
-        if (todayBar && todayValLabel) {
-          const newHeight = Math.min((newMl / 150) * 90, 90);
-          todayBar.style.height = `${newHeight}px`;
-          todayValLabel.innerText = Math.round(newMl);
-        }
-      });
+      const randomMsg = getRandomMessage();
+      enforceBlockade(randomMsg);
+      return;
     }
+
+    const newCount = currentCount + 1;
+
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    }
+
+    // Actualizamos el contador de consultas en el almacenamiento local
+    chrome.storage.local.set({ [todayKey]: newCount }, () => {
+      const newMl = newCount * ML_PER_PROMPT;
+      const newGlasses = (newMl / 250).toFixed(3);
+
+      // Actualización en tiempo real de los elementos visuales del dashboard
+      const counterEl = document.getElementById("nibble-count");
+      if (counterEl) counterEl.innerText = newCount;
+
+      const waterEl = document.getElementById("nibble-water");
+      if (waterEl) {
+        waterEl.innerText = newMl >= 1000 ? `${(newMl / 1000).toFixed(2)} Litros` : `${newMl} ml`;
+      }
+
+      const glassesEl = document.getElementById("nibble-glasses");
+      if (glassesEl) {
+        glassesEl.innerText = newGlasses;
+      }
+
+      const statusTextEl = document.getElementById("nibble-status-text");
+      const statusBadgeEl = document.getElementById("nibble-status-badge");
+      const isDarkTheme = document.getElementById("nibblelaxy-sidebar").classList.contains("dark-theme");
+
+      let sText = "Óptimo";
+      let sColor = isDarkTheme ? "#10b981" : "#059669";
+      let sBg = isDarkTheme ? "rgba(16, 185, 129, 0.15)" : "#ecfdf5";
+
+      if (newCount > 0 && newCount < DAILY_LIMIT) {
+        sText = "Moderado";
+        sColor = isDarkTheme ? "#fbbf24" : "#d97706";
+        sBg = isDarkTheme ? "rgba(251, 191, 36, 0.15)" : "#fffbeb";
+      } else if (newCount >= DAILY_LIMIT) {
+        sText = "Crítico (Bloqueado)";
+        sColor = isDarkTheme ? "#ef4444" : "#dc2626";
+        sBg = isDarkTheme ? "rgba(239, 68, 68, 0.15)" : "#fef2f2";
+      }
+
+      if (statusTextEl && statusBadgeEl) {
+        statusTextEl.innerText = sText;
+        statusBadgeEl.style.color = sColor;
+        statusBadgeEl.style.borderColor = sColor;
+        statusBadgeEl.style.backgroundColor = sBg;
+      }
+
+      // Ajustes dinámicos de las barras de la gráfica
+      const scaleMax = newMl <= 150 ? 150 : Math.ceil(newMl / 50) * 50;
+      const newHeight = Math.min((newMl / scaleMax) * 90, 90);
+
+      const todayBar = document.getElementById("chart-today-bar");
+      const todayValLabel = document.getElementById("label-today-val");
+      const scaleMaxLabel = document.getElementById("scale-max-label");
+      const scaleMidLabel = document.getElementById("scale-mid-label");
+
+      if (todayBar && todayValLabel) {
+        todayBar.style.height = `${newHeight}px`;
+        todayValLabel.innerText = Math.round(newMl);
+      }
+
+      if (scaleMaxLabel && scaleMidLabel) {
+        scaleMaxLabel.innerText = `${scaleMax}ml`;
+        scaleMidLabel.innerText = `${scaleMax / 2}ml`;
+      }
+
+      // Si justo en esta consulta se alcanza el límite, activamos de inmediato el bloqueo
+      if (newCount >= DAILY_LIMIT) {
+        blockedCount += 1;
+        chrome.storage.local.set({ ['blocked_' + todayKey]: blockedCount }, () => {
+          const savedMl = blockedCount * ML_PER_PROMPT;
+          const savedValEl = document.getElementById("nibble-saved-val");
+          if (savedValEl) {
+            savedValEl.innerText = `${savedMl} ml`;
+          }
+        });
+
+        const randomMsg = getRandomMessage();
+        enforceBlockade(randomMsg);
+      }
+    });
   });
 }
 
+// ==========================================
+// ESCUCHADORES DE EVENTOS GLOBALES (LISTENERS)
+// ==========================================
+
+// Inicialización del dashboard al cargar la página tras un pequeño retraso
 window.addEventListener('load', () => {
   setTimeout(injectSidebarDashboard, 1500);
 });
 
+// Interceptamos la tecla Enter en el área de texto para validar el consumo
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     checkUsageAndBlock(e);
   }
 }, true);
 
+// Interceptamos los clics sobre el botón de envío de la interfaz de chat
 document.addEventListener('click', (e) => {
   const sendBtn = e.target.closest('button[data-testid="send-button"], button[aria-label*="Send"]');
   if (sendBtn) {
