@@ -41,9 +41,10 @@ function injectSidebarDashboard() {
     blockedAttemptsToday = result['blocked_' + todayKey] || 0;
     const currentTheme = result['nibble_theme'] || 'light';
 
-    // Cálculos de consumo hídrico y equivalencia en vasos (250 ml por vaso)
+    // Cálculos individuales para la estimación unitaria (vasos de 250 ml c/u) y el total consumido hoy
+    const unitWaterText = `${ML_PER_PROMPT} ml`;
     const totalMl = currentCount * ML_PER_PROMPT;
-    let waterText = totalMl >= 1000 ? `${(totalMl / 1000).toFixed(3)} Litros` : `${totalMl} ml`;
+    let totalWaterText = totalMl >= 1000 ? `${(totalMl / 1000).toFixed(3)} Litros` : `${totalMl} ml`;
     const glasses = (totalMl / 250).toFixed(3);
 
     // Definición de iconos y textos descriptivos según el tema (claro u oscuro)
@@ -115,7 +116,11 @@ function injectSidebarDashboard() {
         </div>
         <div class="nibble-metric hover-card">
           <span class="nibble-label">Agua estimada por consulta:</span>
-          <span class="nibble-value" id="nibble-water">${waterText}</span>
+          <span class="nibble-value">${unitWaterText}</span>
+        </div>
+        <div class="nibble-metric hover-card">
+          <span class="nibble-label">Agua total consumida hoy:</span>
+          <span class="nibble-value" id="nibble-water">${totalWaterText}</span>
         </div>
         
         <div class="nibble-box hover-card">
