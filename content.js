@@ -41,11 +41,18 @@ function injectSidebarDashboard() {
     blockedAttemptsToday = result['blocked_' + todayKey] || 0;
     const currentTheme = result['nibble_theme'] || 'light';
 
+    // Verificación inmediata al cargar: si el límite ya está agotado, aplicamos el bloqueo de inmediato para evitar que se mande un mensaje extra al refrescar
+    if (currentCount >= DAILY_LIMIT) {
+      const randomMsg = typeof getRandomMessage === 'function' ? getRandomMessage() : "Has alcanzado tu límite diario de protección hídrica.";
+      enforceBlockade(randomMsg);
+    }
+
     // Cálculos individuales para la estimación unitaria (vasos de 250 ml c/u) y el total consumido hoy
     const unitWaterText = `${ML_PER_PROMPT} ml`;
     const totalMl = currentCount * ML_PER_PROMPT;
     let totalWaterText = totalMl >= 1000 ? `${(totalMl / 1000).toFixed(3)} Litros` : `${totalMl} ml`;
     const glasses = (totalMl / 250).toFixed(3);
+    const availableQueries = Math.max(0, DAILY_LIMIT - currentCount);
 
     // Definición de iconos y textos descriptivos según el tema (claro u oscuro)
     const themeIcon = currentTheme === 'dark' ? '☀️' : '🌙';
@@ -113,6 +120,10 @@ function injectSidebarDashboard() {
         <div class="nibble-metric hover-card">
           <span class="nibble-label">Consultas realizadas hoy:</span>
           <span class="nibble-value" id="nibble-count">${currentCount}</span>
+        </div>
+        <div class="nibble-metric hover-card">
+          <span class="nibble-label">Consultas disponibles:</span>
+          <span class="nibble-value" id="nibble-available">${availableQueries}</span>
         </div>
         <div class="nibble-metric hover-card">
           <span class="nibble-label">Agua estimada por consulta:</span>
@@ -533,6 +544,20 @@ function injectSidebarDashboard() {
 // ==========================================
 // CONTROL DE BLOQUEO Y BANNER DE ALERTA
 // ==========================================
+
+// Función para calcular el tiempo exacto restante hasta la medianoche (reinicio de consultas)
+function getTimeUntilMidnight() {
+  const now = new Date();
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0); // Establece la medianoche del día actual
+  
+  const diffMs = midnight - now;
+  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  return `${diffHrs} horas y ${diffMins} minutos`;
+}
+
 function enforceBlockade(message) {
   // Inyección de estilos para el banner flotante central y bloqueo de la interfaz de ChatGPT
   if (!document.getElementById("nibblelaxy-block-style")) {
@@ -571,11 +596,13 @@ function enforceBlockade(message) {
 
   // Creación del banner de advertencia con el mensaje reflexivo en renglón aparte
   if (!document.getElementById("nibblelaxy-block-banner")) {
+    const timeRemaining = getTimeUntilMidnight();
     const banner = document.createElement("div");
     banner.id = "nibblelaxy-block-banner";
     banner.innerHTML = `
-      <div style="color: #ef4444; font-weight: bold; font-size: 14px; margin-bottom: 8px;">Has alcanzado tu límite diario de consultas.</div>
-      <div style="color: #cbd5e1; font-size: 12px; line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 8px;">${message}</div>
+      <div style="color: #ef4444; font-weight: bold; font-size: 14px; margin-bottom: 6px;">Has alcanzado tu límite diario de consultas.</div>
+      <div style="color: #cbd5e1; font-size: 12px; line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 6px; margin-bottom: 6px;">${message}</div>
+      <div style="color: #38bdf8; font-size: 11px; font-weight: bold; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 6px;">Tus consultas se reiniciarán en aproximadamente ${timeRemaining}.</div>
     `;
     document.body.appendChild(banner);
   }
@@ -627,6 +654,10 @@ function checkUsageAndBlock(event) {
       // Actualización en tiempo real de los elementos visuales del dashboard
       const counterEl = document.getElementById("nibble-count");
       if (counterEl) counterEl.innerText = newCount;
+
+      // Actualización en tiempo real de las consultas disponibles
+      const availableEl = document.getElementById("nibble-available");
+      if (availableEl) availableEl.innerText = Math.max(0, DAILY_LIMIT - newCount);
 
       const waterEl = document.getElementById("nibble-water");
       if (waterEl) {
